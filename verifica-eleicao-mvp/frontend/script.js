@@ -75,6 +75,11 @@ async function analyze() {
   verifyButton.textContent = "Analisando...";
   showStatus("A IA está lendo o print e verificando as informações. Isso pode levar alguns segundos.");
 
+  // Se passar de 5 segundos, avisa que a demora é por causa da alta demanda.
+  const slowTimer = setTimeout(() => {
+    showStatus("A análise está demorando um pouco mais porque os servidores estão com alta demanda no momento. Aguarde, por favor.");
+  }, 5000);
+
   try {
     const formData = new FormData();
     formData.append("image", selectedFile);
@@ -97,6 +102,7 @@ async function analyze() {
   } catch (error) {
     showStatus(error.message, true);
   } finally {
+    clearTimeout(slowTimer);
     verifyButton.disabled = false;
     verifyButton.textContent = "Verificar notícia";
   }
