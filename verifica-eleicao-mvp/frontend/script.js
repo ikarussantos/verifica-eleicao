@@ -1,5 +1,5 @@
-// Endereço do backend publicado (troque depois de publicar no Render).
-const PRODUCTION_API_URL = "https://SEU-BACKEND-AQUI.example.com/api/analyze";
+// Endereço do backend publicado no Render.
+const PRODUCTION_API_URL = "https://verifica-eleicao-api.onrender.com/api/analyze";
 
 // No seu computador usa o servidor local; publicado, usa o de produção.
 const isLocal = location.protocol === "file:" ||

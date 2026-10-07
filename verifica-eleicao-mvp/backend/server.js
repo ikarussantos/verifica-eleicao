@@ -138,7 +138,7 @@ app.post("/api/analyze", analyzeLimiter, upload.single("image"), async (req, res
 
     const models = [
       process.env.GEMINI_MODEL || "gemini-3.8-flash",
-      ...(process.env.GEMINI_FALLBACK_MODELS || "gemini-3.5-flash-lite")
+      ...(process.env.GEMINI_FALLBACK_MODELS || "gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.1-flash-lite")
         .split(",").map((m) => m.trim()).filter(Boolean)
     ];
 

@@ -24,7 +24,7 @@ Copie `.env.example` para `.env` e coloque sua chave do Google AI Studio:
 ```env
 GEMINI_API_KEY=sua_chave_aqui
 GEMINI_MODEL=gemini-3.8-flash
-GEMINI_FALLBACK_MODELS=gemini-3.5-flash-lite
+GEMINI_FALLBACK_MODELS=gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.1-flash-lite
 FRONTEND_ORIGIN=*
 PORT=3000
 GEMINI_WEB_SEARCH=false
