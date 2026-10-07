@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verifica Eleição</title>
+  <meta name="description" content="Verifique informações eleitorais com apoio de inteligência artificial.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-icon">✓</span>
+      <span>Verifica <strong>Eleição</strong></span>
+    </div>
+    <span class="badge">IA + fontes públicas</span>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <p class="eyebrow">INFORMAÇÃO POLÍTICA MERECE EVIDÊNCIA</p>
+      <h1>Essa notícia é<br><span>verdadeira?</span></h1>
+      <p class="subtitle">
+        Envie um print de uma notícia, publicação ou mensagem. A IA vai analisar a afirmação,
+        buscar evidências e explicar o resultado.
+      </p>
+
+      <div id="dropZone" class="upload-card">
+        <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+        <div id="uploadPlaceholder">
+          <div class="upload-icon">↑</div>
+          <h2>Envie um print</h2>
+          <p>Arraste a imagem para cá ou clique para selecionar</p>
+          <button id="selectButton" class="primary-btn" type="button">Selecionar imagem</button>
+          <small>PNG, JPG ou WebP · até 10 MB</small>
+        </div>
+
+        <div id="previewArea" class="preview-area hidden">
+          <img id="previewImage" alt="Prévia da imagem enviada">
+          <div class="preview-actions">
+            <button id="changeButton" class="secondary-btn" type="button">Trocar imagem</button>
+            <button id="verifyButton" class="primary-btn" type="button">Verificar notícia</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="status" class="status hidden"></div>
+    </section>
+
+    <section id="resultSection" class="result-section hidden">
+      <div class="section-title">
+        <span>RESULTADO DA ANÁLISE</span>
+        <button id="newCheckButton" class="link-btn" type="button">Nova verificação</button>
+      </div>
+
+      <article id="resultCard" class="result-card">
+        <div class="result-head">
+          <div id="verdictIcon" class="verdict-icon">?</div>
+          <div>
+            <p class="result-label">CONCLUSÃO</p>
+            <h2 id="verdict">Aguardando análise</h2>
+          </div>
+        </div>
+
+        <div class="claim-box">
+          <p class="mini-label">AFIRMAÇÃO ANALISADA</p>
+          <p id="claim">—</p>
+        </div>
+
+        <div class="analysis-grid">
+          <div>
+            <p class="mini-label">RESUMO</p>
+            <p id="summary">—</p>
+          </div>
+          <div>
+            <p class="mini-label">EVIDÊNCIAS</p>
+            <p id="evidence">—</p>
+          </div>
+        </div>
+
+        <div id="sourcesContainer" class="sources">
+          <p class="mini-label">FONTES CONSULTADAS</p>
+          <div id="sourcesList"></div>
+        </div>
+
+        <p class="disclaimer">
+          Esta ferramenta oferece uma análise automatizada e não substitui a leitura das fontes.
+          “Não confirmado” significa que as evidências encontradas não foram suficientes para concluir.
+        </p>
+      </article>
+    </section>
+
+    <section class="how">
+      <p class="eyebrow">COMO FUNCIONA</p>
+      <div class="steps">
+        <div class="step"><span>1</span><h3>Envie</h3><p>Faça upload do print da informação.</p></div>
+        <div class="step"><span>2</span><h3>Analise</h3><p>A IA identifica a afirmação principal.</p></div>
+        <div class="step"><span>3</span><h3>Pesquise</h3><p>O sistema compara evidências e fontes.</p></div>
+        <div class="step"><span>4</span><h3>Entenda</h3><p>Você recebe uma conclusão explicada.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Verifica Eleição · Projeto experimental de verificação de informações</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

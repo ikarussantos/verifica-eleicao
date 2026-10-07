@@ -1,0 +1,32 @@
+# Publica a pasta do site (frontend) no GitHub Pages a cada envio para a main.
+name: Publicar site no GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["verifica-eleicao-mvp/frontend/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: verifica-eleicao-mvp/frontend
+      - id: deployment
+        uses: actions/deploy-pages@v4
