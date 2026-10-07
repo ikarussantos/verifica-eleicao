@@ -80,13 +80,18 @@ async function analyze() {
     showStatus("A análise está demorando um pouco mais porque os servidores estão com alta demanda no momento. Aguarde, por favor.");
   }, 5000);
 
+  // Desiste depois de 2 minutos para a tela não ficar presa em "Analisando...".
+  const controller = new AbortController();
+  const abortTimer = setTimeout(() => controller.abort(), 120000);
+
   try {
     const formData = new FormData();
     formData.append("image", selectedFile);
 
     const response = await fetch(API_URL, {
       method: "POST",
-      body: formData
+      body: formData,
+      signal: controller.signal
     });
 
     const data = await response.json();
@@ -100,9 +105,13 @@ async function analyze() {
     resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
     showStatus("Análise concluída.");
   } catch (error) {
-    showStatus(error.message, true);
+    const message = error.name === "AbortError"
+      ? "A análise demorou demais por causa da alta demanda nos servidores. Tente novamente em alguns minutos."
+      : error.message;
+    showStatus(message, true);
   } finally {
     clearTimeout(slowTimer);
+    clearTimeout(abortTimer);
     verifyButton.disabled = false;
     verifyButton.textContent = "Verificar notícia";
   }

@@ -3,13 +3,16 @@ import express from "express";
 import cors from "cors";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, GoogleGenerativeAIAbortError } from "@google/generative-ai";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Pesquisa no Google (grounding). Exige faturamento ativo na conta do Gemini.
 const WEB_SEARCH = process.env.GEMINI_WEB_SEARCH === "true";
+
+// Tempo máximo de espera por modelo antes de tentar o próximo.
+const MODEL_TIMEOUT_MS = Number(process.env.MODEL_TIMEOUT_MS) || 25000;
 
 // Em hospedagens como o Render, o IP real do usuário vem do proxy.
 app.set("trust proxy", 1);
@@ -90,17 +93,21 @@ IMPORTANTE:
 `;
 }
 
-// Tenta cada modelo em ordem; passa para o próximo se estiver sobrecarregado (503).
+// Tenta cada modelo em ordem; passa para o próximo se estiver sobrecarregado
+// (503) ou se demorar demais para responder.
 async function generate(genAI, models, parts, withSearch) {
   const tools = withSearch ? [{ googleSearch: {} }] : undefined;
   for (const [i, name] of models.entries()) {
     try {
-      return await genAI.getGenerativeModel({ model: name, tools })
+      return await genAI
+        .getGenerativeModel({ model: name, tools }, { timeout: MODEL_TIMEOUT_MS })
         .generateContent(parts);
     } catch (error) {
+      const timedOut = error instanceof GoogleGenerativeAIAbortError;
       const isLast = i === models.length - 1;
-      if (error.status !== 503 || isLast) throw error;
-      console.warn(`Modelo ${name} sobrecarregado, tentando ${models[i + 1]}...`);
+      if ((error.status !== 503 && !timedOut) || isLast) throw error;
+      const reason = timedOut ? "demorou demais" : "sobrecarregado";
+      console.warn(`Modelo ${name} ${reason}, tentando ${models[i + 1]}...`);
     }
   }
 }
@@ -193,7 +200,7 @@ app.post("/api/analyze", analyzeLimiter, upload.single("image"), async (req, res
     res.json(parsed);
   } catch (error) {
     console.error(error);
-    if (error.status === 503) {
+    if (error.status === 503 || error instanceof GoogleGenerativeAIAbortError) {
       return res.status(503).json({
         error: "A IA está sobrecarregada no momento. Tente novamente em alguns minutos."
       });
