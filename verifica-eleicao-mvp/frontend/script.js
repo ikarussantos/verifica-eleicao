@@ -143,9 +143,13 @@ function renderResult(data) {
   document.getElementById("claim").textContent = data.claim || "Não foi possível identificar a afirmação principal.";
   document.getElementById("summary").textContent = data.summary || "Sem resumo disponível.";
   const evidence = data.evidence || "Sem evidências suficientes.";
-  document.getElementById("evidence").textContent = data.webSearch === false
-    ? `${evidence} (Análise feita sem pesquisa na internet.)`
-    : evidence;
+  const notes = {
+    found: "Comparado com checagens publicadas por agências de fact-checking.",
+    none: "Nenhuma checagem publicada sobre esta afirmação foi encontrada nas agências de fact-checking."
+  };
+  const note = notes[data.factCheck] ||
+    (data.webSearch === false ? "Análise feita sem pesquisa na internet." : "");
+  document.getElementById("evidence").textContent = note ? `${evidence} (${note})` : evidence;
 
   const sourcesList = document.getElementById("sourcesList");
   sourcesList.innerHTML = "";

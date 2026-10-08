@@ -41,6 +41,7 @@ Inicie com `npm start` e abra `frontend/index.html` no navegador. Quando aberto 
 | `GEMINI_FALLBACK_MODELS` | Modelos reserva, separados por vírgula, usados quando o principal está sobrecarregado. |
 | `HEDGE_AFTER_MS` | Se o modelo não responder nesse tempo (padrão 8000 ms), o reserva começa em paralelo e vale a primeira resposta. |
 | `GEMINI_WEB_SEARCH` | `true` ativa a pesquisa no Google para checar as notícias. Exige faturamento ativo na conta do Gemini. Sem cota, a análise é feita sem pesquisa. |
+| `FACTCHECK_API_KEY` | Chave do Google Cloud com a **Fact Check Tools API** ativada (gratuita). Com ela, o site busca checagens já publicadas por agências como Lupa e Aos Fatos e usa essas checagens no veredito. |
 | `RATE_LIMIT_PER_HOUR` | Máximo de análises por pessoa (IP) por hora. |
 | `FRONTEND_ORIGIN` | Endereço do site autorizado a usar a API (ex.: `https://usuario.github.io`). |
 
@@ -54,7 +55,7 @@ No plano gratuito, o Render desliga o servidor após 15 minutos sem uso. Para di
 
 ## Próximas melhorias
 
-- Fact Check Explorer e fontes oficiais do TSE;
+- fontes oficiais do TSE;
 - comparação de múltiplas fontes;
 - histórico opcional;
 - metodologia de avaliação da evidência.

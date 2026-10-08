@@ -13,6 +13,8 @@ services:
         sync: false
       - key: FRONTEND_ORIGIN
         sync: false
+      - key: FACTCHECK_API_KEY
+        sync: false
       - key: GEMINI_MODEL
         value: gemini-3.8-flash
       - key: GEMINI_FALLBACK_MODELS
