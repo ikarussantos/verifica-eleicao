@@ -14,6 +14,9 @@ const WEB_SEARCH = process.env.GEMINI_WEB_SEARCH === "true";
 // Tempo máximo de espera por modelo antes de tentar o próximo.
 const MODEL_TIMEOUT_MS = Number(process.env.MODEL_TIMEOUT_MS) || 25000;
 
+// Se o modelo não responder nesse tempo, o próximo começa em paralelo.
+const HEDGE_AFTER_MS = Number(process.env.HEDGE_AFTER_MS) || 8000;
+
 // Em hospedagens como o Render, o IP real do usuário vem do proxy.
 app.set("trust proxy", 1);
 
@@ -93,23 +96,55 @@ IMPORTANTE:
 `;
 }
 
-// Tenta cada modelo em ordem; passa para o próximo se estiver sobrecarregado
-// (503) ou se demorar demais para responder.
-async function generate(genAI, models, parts, withSearch) {
+// Começa pelo modelo principal. Se ele estiver sobrecarregado (503), estourar o
+// tempo ou passar de HEDGE_AFTER_MS sem responder, dispara também o próximo
+// modelo em paralelo. Fica com a primeira resposta que chegar.
+function generate(genAI, models, parts, withSearch) {
   const tools = withSearch ? [{ googleSearch: {} }] : undefined;
-  for (const [i, name] of models.entries()) {
-    try {
-      return await genAI
+  const retryable = (error) =>
+    error.status === 503 || error instanceof GoogleGenerativeAIAbortError;
+
+  return new Promise((resolve, reject) => {
+    let next = 0;
+    let running = 0;
+    let finished = false;
+    let hedgeTimer;
+
+    const finish = (fn, value) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(hedgeTimer);
+      fn(value);
+    };
+
+    const launch = () => {
+      if (finished || next >= models.length) return;
+      const name = models[next++];
+      running++;
+
+      clearTimeout(hedgeTimer);
+      hedgeTimer = setTimeout(() => {
+        if (next < models.length) console.warn(`Modelo ${name} lento, disparando ${models[next]} em paralelo...`);
+        launch();
+      }, HEDGE_AFTER_MS);
+
+      genAI
         .getGenerativeModel({ model: name, tools }, { timeout: MODEL_TIMEOUT_MS })
-        .generateContent(parts);
-    } catch (error) {
-      const timedOut = error instanceof GoogleGenerativeAIAbortError;
-      const isLast = i === models.length - 1;
-      if ((error.status !== 503 && !timedOut) || isLast) throw error;
-      const reason = timedOut ? "demorou demais" : "sobrecarregado";
-      console.warn(`Modelo ${name} ${reason}, tentando ${models[i + 1]}...`);
-    }
-  }
+        .generateContent(parts)
+        .then((result) => finish(resolve, result))
+        .catch((error) => {
+          running--;
+          if (finished) return;
+          if (!retryable(error)) return finish(reject, error);
+          const reason = error.status === 503 ? "sobrecarregado" : "demorou demais";
+          console.warn(`Modelo ${name} ${reason}.`);
+          if (next < models.length) launch();
+          else if (running === 0) finish(reject, error);
+        });
+    };
+
+    launch();
+  });
 }
 
 function extractJson(raw) {

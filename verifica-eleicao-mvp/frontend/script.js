@@ -6,6 +6,10 @@ const isLocal = location.protocol === "file:" ||
   ["localhost", "127.0.0.1"].includes(location.hostname);
 const API_URL = isLocal ? "http://localhost:3000/api/analyze" : PRODUCTION_API_URL;
 
+// O servidor gratuito do Render "dorme" sem uso. Acorda ele assim que a página
+// abre, para que esteja pronto quando a pessoa enviar o print.
+fetch(new URL("/", API_URL), { cache: "no-store" }).catch(() => {});
+
 const dropZone = document.getElementById("dropZone");
 const imageInput = document.getElementById("imageInput");
 const selectButton = document.getElementById("selectButton");
