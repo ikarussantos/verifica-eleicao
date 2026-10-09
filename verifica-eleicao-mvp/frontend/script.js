@@ -90,7 +90,7 @@ async function analyze() {
 
   try {
     const formData = new FormData();
-    formData.append("image", selectedFile);
+    formData.append("image", await shrinkImage(selectedFile));
 
     const response = await fetch(API_URL, {
       method: "POST",
@@ -118,6 +118,29 @@ async function analyze() {
     clearTimeout(abortTimer);
     verifyButton.disabled = false;
     verifyButton.textContent = "Verificar notícia";
+  }
+}
+
+// Fotos de celular costumam ter vários MB. Reduz para no máximo 1600 px no lado
+// maior antes de enviar: o texto continua legível e o envio fica bem mais rápido.
+async function shrinkImage(file) {
+  const MAX_SIDE = 1600;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1 && file.size <= 1024 * 1024) return file;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], "print.jpg", { type: "image/jpeg" });
+  } catch {
+    return file; // Se o navegador não conseguir reduzir, envia a original.
   }
 }
 

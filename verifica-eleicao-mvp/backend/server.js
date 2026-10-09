@@ -15,7 +15,7 @@ const WEB_SEARCH = process.env.GEMINI_WEB_SEARCH === "true";
 const MODEL_TIMEOUT_MS = Number(process.env.MODEL_TIMEOUT_MS) || 25000;
 
 // Se o modelo não responder nesse tempo, o próximo começa em paralelo.
-const HEDGE_AFTER_MS = Number(process.env.HEDGE_AFTER_MS) || 8000;
+const HEDGE_AFTER_MS = Number(process.env.HEDGE_AFTER_MS) || 6000;
 
 // Busca checagens de agências (Lupa, Aos Fatos etc.) na Google Fact Check Tools API.
 // É gratuita, mas usa uma chave própria do Google Cloud, diferente da do Gemini.
@@ -48,7 +48,13 @@ const analyzeLimiter = rateLimit({
 });
 
 app.get("/", (req, res) => {
-  res.json({ status: "ok", service: "Verifica Eleição API", webSearch: WEB_SEARCH, factCheck: Boolean(FACTCHECK_API_KEY) });
+  res.json({
+    status: "ok",
+    service: "Verifica Eleição API",
+    model: process.env.GEMINI_MODEL || "gemini-3.1-flash-lite",
+    webSearch: WEB_SEARCH,
+    factCheck: Boolean(FACTCHECK_API_KEY)
+  });
 });
 
 function buildPrompt(withSearch) {
@@ -102,13 +108,13 @@ IMPORTANTE:
 `;
 }
 
-// Começa pelo modelo principal. Se ele estiver sobrecarregado (503), estourar o
-// tempo ou passar de HEDGE_AFTER_MS sem responder, dispara também o próximo
-// modelo em paralelo. Fica com a primeira resposta que chegar.
+// Começa pelo modelo principal. Se ele estiver sobrecarregado (503), sem cota
+// (429), estourar o tempo ou passar de HEDGE_AFTER_MS sem responder, dispara
+// também o próximo modelo em paralelo. Fica com a primeira resposta que chegar.
 function generate(genAI, models, parts, withSearch) {
   const tools = withSearch ? [{ googleSearch: {} }] : undefined;
   const retryable = (error) =>
-    error.status === 503 || error instanceof GoogleGenerativeAIAbortError;
+    [429, 503].includes(error.status) || error instanceof GoogleGenerativeAIAbortError;
 
   return new Promise((resolve, reject) => {
     let next = 0;
@@ -142,7 +148,7 @@ function generate(genAI, models, parts, withSearch) {
           running--;
           if (finished) return;
           if (!retryable(error)) return finish(reject, error);
-          const reason = error.status === 503 ? "sobrecarregado" : "demorou demais";
+          const reason = { 503: "sobrecarregado", 429: "sem cota" }[error.status] || "demorou demais";
           console.warn(`Modelo ${name} ${reason}.`);
           if (next < models.length) launch();
           else if (running === 0) finish(reject, error);
@@ -259,8 +265,8 @@ app.post("/api/analyze", analyzeLimiter, upload.single("image"), async (req, res
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
     const models = [
-      process.env.GEMINI_MODEL || "gemini-3.8-flash",
-      ...(process.env.GEMINI_FALLBACK_MODELS || "gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.1-flash-lite")
+      process.env.GEMINI_MODEL || "gemini-3.1-flash-lite",
+      ...(process.env.GEMINI_FALLBACK_MODELS || "gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.8-flash")
         .split(",").map((m) => m.trim()).filter(Boolean)
     ];
 
@@ -322,9 +328,7 @@ app.post("/api/analyze", analyzeLimiter, upload.single("image"), async (req, res
 
     if (factChecks.length) {
       try {
-        // Comparar textos é uma tarefa simples: começa pelos modelos leves (reserva).
-        const reviewModels = [...models.slice(1), models[0]];
-        const review = await generate(genAI, reviewModels, [buildReviewPrompt(parsed, factChecks)], false);
+        const review = await generate(genAI, models, [buildReviewPrompt(parsed, factChecks)], false);
         const reviewed = extractJson(review.response.text());
         const urls = (list) => new Set(Array.isArray(list) ? list : []);
         const relevant = urls(reviewed.relevantUrls);
