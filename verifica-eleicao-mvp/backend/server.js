@@ -84,7 +84,7 @@ RESPONDA SOMENTE com JSON válido neste formato:
   "claim": "afirmação principal identificada",
   "summary": "resumo objetivo em português",
   "evidence": "explicação curta das evidências e limitações",
-  "searchQuery": "3 a 6 palavras-chave em português para buscar checagens sobre a afirmação (nomes, tema, fato principal)",
+  "searchQueries": ["3 buscas CURTAS em português, de 2 ou 3 palavras cada, para achar checagens sobre a afirmação. Ex.: \\"urnas hackeadas\\", \\"fraude eleição 2022\\""],
   "sources": [
     {
       "title": "Fonte ou referência que poderia ser consultada",
@@ -224,10 +224,11 @@ Foram encontradas estas checagens publicadas por agências de fact-checking
 ${JSON.stringify(factChecks, null, 2)}
 
 TAREFA:
-1. Avalie se cada checagem trata da MESMA afirmação do print. Ignore as que tratam de outro assunto.
-2. Se alguma checagem for sobre a mesma afirmação, use-a como principal evidência para o veredito e cite a agência e a data no campo "evidence".
-3. Se nenhuma for relevante, mantenha o veredito da primeira análise e diga em "evidence" que não foram encontradas checagens sobre essa afirmação.
-4. Não invente fontes, datas ou classificações. Não favoreça nenhum partido ou candidato.
+1. Avalie se cada checagem trata da MESMA alegação central do print: o mesmo fato ou boato (mesma eleição, pessoas ou acontecimento), mesmo que com outras palavras ou detalhes diferentes. Ex.: um print dizendo "urnas foram hackeadas em 2022, confirma técnico" e uma checagem "É falso que urnas foram invadidas nas eleições de 2022" tratam da mesma alegação central. Ignore checagens sobre fatos diferentes, ainda que do mesmo tema geral.
+2. Se alguma checagem for sobre a mesma alegação central, use-a como principal evidência para o veredito e cite a agência e a data no campo "evidence".
+3. Se nenhuma tratar da mesma alegação central, mantenha o veredito da primeira análise e diga em "evidence" que não foram encontradas checagens sobre essa afirmação específica.
+4. Separadamente, liste em "relatedUrls" as checagens que, sem tratar da mesma alegação, são sobre o mesmo assunto e ajudam o leitor a entender o contexto (ex.: outros boatos já desmentidos sobre fraude nas urnas).
+5. Não invente fontes, datas ou classificações. Não favoreça nenhum partido ou candidato.
 
 CLASSIFICAÇÃO: Verdadeiro, Falso, Enganoso, Parcialmente verdadeiro ou Não confirmado.
 
@@ -237,7 +238,8 @@ RESPONDA SOMENTE com JSON válido neste formato:
   "claim": "afirmação principal identificada",
   "summary": "resumo objetivo em português",
   "evidence": "explicação curta das evidências e limitações",
-  "relevantUrls": ["url de cada checagem que trata da mesma afirmação"]
+  "relevantUrls": ["url de cada checagem que trata da mesma alegação central"],
+  "relatedUrls": ["url de cada checagem relacionada ao mesmo assunto"]
 }
 `;
 }
@@ -303,10 +305,20 @@ app.post("/api/analyze", analyzeLimiter, upload.single("image"), async (req, res
       }));
     if (webSources.length) sources = webSources;
 
-    // Checagens de agências: busca pelas palavras-chave e, se não achar, pela afirmação.
+    // Checagens de agências. A API só encontra resultados com buscas curtas,
+    // então fazemos as buscas sugeridas pela IA em paralelo e juntamos tudo.
     let factCheckStatus = FACTCHECK_API_KEY ? "none" : "off";
-    let factChecks = await searchFactChecks(String(parsed.searchQuery || ""));
-    if (!factChecks.length) factChecks = await searchFactChecks(String(parsed.claim || ""));
+    const queries = (Array.isArray(parsed.searchQueries) ? parsed.searchQueries : [])
+      .map((query) => String(query).trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    const factChecks = [];
+    for (const list of await Promise.all(queries.map(searchFactChecks))) {
+      for (const item of list) {
+        if (!factChecks.some((existing) => existing.url === item.url)) factChecks.push(item);
+      }
+    }
+    factChecks.splice(8);
 
     if (factChecks.length) {
       try {
@@ -314,23 +326,27 @@ app.post("/api/analyze", analyzeLimiter, upload.single("image"), async (req, res
         const reviewModels = [...models.slice(1), models[0]];
         const review = await generate(genAI, reviewModels, [buildReviewPrompt(parsed, factChecks)], false);
         const reviewed = extractJson(review.response.text());
-        const relevant = new Set(Array.isArray(reviewed.relevantUrls) ? reviewed.relevantUrls : []);
+        const urls = (list) => new Set(Array.isArray(list) ? list : []);
+        const relevant = urls(reviewed.relevantUrls);
+        const related = urls(reviewed.relatedUrls);
         const relevantChecks = factChecks.filter((item) => relevant.has(item.url));
+        const relatedChecks = factChecks.filter((item) => related.has(item.url) && !relevant.has(item.url));
+        const toSource = (item, label) => ({
+          title: `${item.publisher}: ${item.title}`,
+          url: item.url,
+          description: [label, item.rating && `Classificação: ${item.rating}`, item.date].filter(Boolean).join(" • ")
+        });
 
         for (const key of ["verdict", "claim", "summary", "evidence"]) {
           if (reviewed[key]) parsed[key] = reviewed[key];
         }
-        if (relevantChecks.length) {
-          factCheckStatus = "found";
-          sources = [
-            ...relevantChecks.map((item) => ({
-              title: `${item.publisher}: ${item.title}`,
-              url: item.url,
-              description: [item.rating && `Classificação: ${item.rating}`, item.date].filter(Boolean).join(" • ")
-            })),
-            ...sources
-          ];
-        }
+        if (relevantChecks.length) factCheckStatus = "found";
+        else if (relatedChecks.length) factCheckStatus = "related";
+        sources = [
+          ...relevantChecks.map((item) => toSource(item, "Checagem desta alegação")),
+          ...relatedChecks.slice(0, 3).map((item) => toSource(item, "Checagem relacionada")),
+          ...sources
+        ];
       } catch (error) {
         // Se a revisão falhar, fica valendo a primeira análise.
         console.warn("Revisão com as checagens falhou:", error.message);
@@ -344,7 +360,7 @@ app.post("/api/analyze", analyzeLimiter, upload.single("image"), async (req, res
     }));
     parsed.webSearch = usedSearch;
     parsed.factCheck = factCheckStatus;
-    delete parsed.searchQuery;
+    delete parsed.searchQueries;
 
     res.json(parsed);
   } catch (error) {

@@ -145,6 +145,7 @@ function renderResult(data) {
   const evidence = data.evidence || "Sem evidências suficientes.";
   const notes = {
     found: "Comparado com checagens publicadas por agências de fact-checking.",
+    related: "Não há checagem desta afirmação exata, mas há checagens relacionadas nas fontes abaixo.",
     none: "Nenhuma checagem publicada sobre esta afirmação foi encontrada nas agências de fact-checking."
   };
   const note = notes[data.factCheck] ||
